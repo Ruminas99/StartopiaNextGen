@@ -16,34 +16,34 @@ if true then
     function Meds() SendPacket(2, "action|dialog_return\ndialog_name|startopia\nbuttonClicked|tool6524"); LogToConsole("`b[`2TOOLS`b] `4Space Meds") end
 
     -- ==========================================
-    -- 2. DATABASE UTAMA & EVENT DADAKAN
+    -- 2. DATABASE (Semua yang dari log lama dimasukin)
     -- ==========================================
-    -- Menggunakan Micro-Keywords agar kebal Typo & Linebreaks dari server GT
     local external_events = {
-        ["grumpy ambassador"] = Dip,
-        ["it's your mother"] = Dip,
-        ["pirate are hacking"] = AI,
-        ["pirates are hacking"] = AI,
-        ["popups when they hail"] = AI,
-        ["leaking radiation"] = Meds,
-        ["misfiled documents"] = Doc,
-        ["bureaucrat from"] = Doc,
+        ["Grumpy Ambassador"] = Dip,
+        ["It's your mother!"] = Dip,
+        ["Pirates are hacking"] = AI,
+        ["Pirate are hacking"] = AI,
+        ["Star Command are not happy"] = AI,
+        ["reactor's leaking radiation"] = Meds,
+        ["Misfiled documents"] = Doc,
+        ["bureaucrat from Laymtak"] = Doc,
         ["wing of pirate ships"] = Torp,
+        ["Grinding sound coming"] = Torp,
+        ["test fire of the Torpedoes"] = Torp,
         ["rogue fighter"] = Torp,
-        ["grinding sound"] = Torp,
-        ["test fire of the torpedoes"] = Torp,
-        ["silicoid worms"] = Shield,
-        ["still fluctuating"] = Shield,
-        ["space debris"] = Shield,
-        ["rabid space dogs"] = Giga,
-        ["disloyal crew"] = Giga,
-        ["space snakes"] = Giga,
+        ["Silicoid Worms attached"] = Shield,
+        ["Shield Generator still fluctuating"] = Shield,
+        ["Space Debris"] = Shield,
+        ["Rabid space dogs"] = Giga,
+        ["Disloyal crew"] = Giga,
+        ["Space snakes attack"] = Giga,
+        ["The main cargo bay door isn't opening"] = Gala,
         ["cargo door isn't opening"] = Gala,
-        ["almost hanging off"] = Gala,
-        ["lights throughout the ship"] = Gala,
+        ["engine is almost hanging off"] = Gala,
+        ["lights throughout the ship are failing"] = Gala,
         ["plumbing isn't working"] = Gala,
-        ["losing pressure to that oxygen"] = Gala,
-        ["starvation crisis"] = Sup
+        ["losing pressure to that oxygen leak"] = Gala,
+        ["starvation crisis are blaming us"] = Sup
     }
 
     local exact_missions = {
@@ -58,9 +58,9 @@ if true then
         ["Cryonite Crisis"] = {Teleporter, Scan, Giga, Scan, AI, AI, Shield, Gala, Doc, Teleporter},
         ["Dark Ship"] = {Drone, Teleporter, AI, Torp, Torp},
         ["Daydreamer"] = {Drone, Teleporter, Dip, Giga},
-        ["Doing The Job"] = {Drone, Dip, Teleporter, Sup, Doc, Teleporter},
-        ["Doing The Right Thing"] = {Drone, Shield, Teleporter, Giga, Scan, Teleporter},
-        ["Doctor In The House"] = {Drone, Teleporter, Dip, Meds, Giga, Dip},
+        ["Doing The Job!"] = {Drone, Dip, Teleporter, Sup, Doc, Teleporter},
+        ["Doing The Right Thing!"] = {Drone, Shield, Teleporter, Giga, Scan, Teleporter},
+        ["Doctor In The House!"] = {Drone, Teleporter, Dip, Meds, Giga, Dip},
         ["Escape Pod"] = {Meds, Drone, Shield, Teleporter, Scan, Giga, Meds, Scan, Teleporter, Torp},
         ["Experimental Salvage"] = {Drone, Teleporter, Teleporter, Teleporter, Teleporter},
         ["Ghost Ship"] = {Drone, Teleporter, Scan, Dip, Doc, Teleporter},
@@ -87,7 +87,7 @@ if true then
         ["She's Gonna Blow"] = {Drone, Teleporter, Scan, AI, Scan, Giga},
         ["Space Ship Rescue"] = {Gala, Drone, Teleporter, Scan, Meds, Teleporter},
         ["Skeleton Crew"] = {Teleporter, Scan, AI, Doc},
-        ["Solar Impact"] = {Shield, Gala, Meds, AI, Drone, Gala, Meds, Gala},
+        ["Solar Impact!"] = {Shield, Gala, Meds, AI, Drone, Gala, Meds, Gala},
         ["Space Detective"] = {Drone, Teleporter, Doc, Torp},
         ["Space Opera"] = {Drone, Teleporter, Dip, Dip, Giga, Doc},
         ["Starachnid Attack"] = {Drone, Torp, Sup, Torp, Giga},
@@ -95,157 +95,154 @@ if true then
         ["Taking Aim"] = {Drone, Teleporter, Giga, Teleporter},
         ["Tasty Cakes"] = {Drone, Teleporter, Scan, AI, Scan, Giga, Teleporter},
         ["Weird Contraption"] = {Drone, Teleporter, Scan, Teleporter, Doc},
+        ["Who's there?"] = {Drone, Teleporter, Scan, AI, Scan, Giga},
         ["Who's There"] = {Drone, Teleporter, Scan, AI, Scan, Giga},
         ["Windy Days"] = {Drone, Teleporter, Scan, Teleporter}
     }
 
-    local successes = 0
-    local current_mission = ""
-    local handling_event = false
-    local neutral_count = 0 
-    local just_healed = false 
-    local queued_heals = {} -- Sistem antrean Heal
+    -- ==========================================
+    -- 3. MESIN NORMALISASI (ANTI-TYPO)
+    -- ==========================================
+    -- Fungsi ini menghapus warna, spasi, dan semua tanda baca agar pencocokan 100% sempurna
+    local function cleanString(str)
+        if not str then return "" end
+        local s = str:gsub("`.", "") -- Hapus kode warna
+        s = s:gsub("[%p%c%s]", "") -- Hapus spasi dan tanda baca (!, ?, ', dll)
+        return s:lower() -- Jadikan huruf kecil semua
+    end
 
-    local function getMissionSequenceAndName(title)
-        if title == "" then return nil, nil end
-        if exact_missions[title] then return exact_missions[title], title end
+    -- Siapkan database yang sudah bersih
+    local db_missions = {}
+    for k, v in pairs(exact_missions) do
+        db_missions[cleanString(k)] = {original_name = k, seq = v}
+    end
+
+    local db_events = {}
+    for k, v in pairs(external_events) do
+        db_events[cleanString(k)] = {original_name = k, tool = v}
+    end
+
+    local function getMissionSequenceAndName(raw_title)
+        if not raw_title or raw_title == "" then return nil, nil end
+        local norm_title = cleanString(raw_title)
         
-        -- Fallback Regex kalau misi benar-benar baru
-        if title:find("Data") then return {Drone, Teleporter, Scan, Teleporter, Doc}, title end
-        if title:find("Attack") then return {Drone, Shield, Torp, Torp}, title end
-        if title:find("Hunt") then return {Drone, Teleporter, Scan, Giga, Teleporter}, title end
-        if title:find("Cleanup") then return {Drone, Shield, Torp, Shield, Doc}, title end
-        if title:find("Duel") then return {Drone, Shield, Torp, AI, Torp}, title end
-        if title:find("Delivery") then return {Drone, Teleporter, Scan, Giga, Sup}, title end
-        if title:find("Extermination") then return {Drone, Teleporter, Scan, Giga, Sup}, title end
-        if title:find("Rescue") then return {Drone, Teleporter, Dip, Meds, Doc}, title end
+        -- Cek kecocokan absolut (Abaikan spasi & tanda seru)
+        if db_missions[norm_title] then 
+            return db_missions[norm_title].seq, db_missions[norm_title].original_name 
+        end
+        
+        -- Pencocokan Regex kalau misinya ada variasinya
+        if norm_title:find("data") then return {Drone, Teleporter, Scan, Teleporter, Doc}, raw_title end
+        if norm_title:find("attack") then return {Drone, Shield, Torp, Torp}, raw_title end
+        if norm_title:find("hunt") then return {Drone, Teleporter, Scan, Giga, Teleporter}, raw_title end
+        if norm_title:find("cleanup") then return {Drone, Shield, Torp, Shield, Doc}, raw_title end
+        if norm_title:find("duel") then return {Drone, Shield, Torp, AI, Torp}, raw_title end
+        if norm_title:find("delivery") then return {Drone, Teleporter, Scan, Giga, Sup}, raw_title end
+        if norm_title:find("extermination") then return {Drone, Teleporter, Scan, Giga, Sup}, raw_title end
+        if norm_title:find("rescue") then return {Drone, Teleporter, Dip, Meds, Doc}, raw_title end
         return nil, nil
     end
 
     -- ==========================================
-    -- 3. HOOK UTAMA
+    -- 4. STATE TRACKER (ANTI LOMPAT)
+    -- ==========================================
+    local action_state = "IDLE" -- Bisa: "IDLE", "MISSION", "OBSTACLE", "HEAL"
+    local successes = 0
+    local neutral_count = 0
+    local current_mission = ""
+    local queued_heals = {}
+
+    -- ==========================================
+    -- 5. HOOK UTAMA
     -- ==========================================
     function Hook(var)
         if var.v1:find("OnDialogRequest") then
             
             if var.v2:find("end_dialog|startopia") and var.v2:find("Health") then
                 
-                local clean_dialog = var.v2:gsub("`.", "")
-                local lower_dialog = clean_dialog:lower()
-                
-                -- TRUE TITLE CLEANER (Membunuh semua simbol dan warna)
                 local raw_title = var.v2:match("add_label_with_icon|big|`w([^|\n]+)")
-                local clean_title = ""
-                if raw_title then
-                    clean_title = raw_title:gsub("`.", ""):gsub("[?!]", ""):match("^%s*(.-)%s*$")
-                end
-
-                -- DETEKSI STATUS HEALTH & REPUTATION
-                local ship_hp = tonumber(lower_dialog:match("ship.-(%d+)%%")) or 100
-                local crew_hp = tonumber(lower_dialog:match("crew.-(%d+)%%")) or 100
-                local rep_hp  = tonumber(lower_dialog:match("rep.-(%d+)%%")) or 100
-
-                local event_finished_now = handling_event
-                handling_event = false
-
-                -- AMBIL SEQUENCE BERDASARKAN CLEAN TITLE
-                local seq, m_name = getMissionSequenceAndName(clean_title)
-                local is_late_stage = false
-                local remaining_steps = 99
+                local dialog_norm = cleanString(var.v2)
                 
-                if seq then
-                    remaining_steps = #seq - successes
-                    is_late_stage = (remaining_steps <= 3)
-                end
-                local is_healthy = (ship_hp >= 80 and crew_hp >= 80 and rep_hp >= 80)
+                -- PROSES SKILL SUCCESS / FAIL BERDASARKAN INGATAN TERAKHIR BOT
+                local is_success = var.v2:find("Skill Success")
+                local is_fail = var.v2:find("Skill Fail")
 
-                -- QUEUE HEALER (Diisi sesaat setelah obstacle berhasil dibersihkan)
-                if event_finished_now then
-                    LogToConsole("`b[`5EVENT`b] `2Obstacle Selesai!")
+                if is_success then
+                    -- HANYA tambah step jika yang sukses itu adalah Tool Misi Utama!
+                    if action_state == "MISSION" then
+                        successes = successes + 1
+                    end
+                    action_state = "IDLE"
+                    neutral_count = 0
+                elseif is_fail then
+                    action_state = "IDLE"
+                    neutral_count = 0
+                else
+                    neutral_count = neutral_count + 1
+                end
+
+                -- DETEKSI EXTERNAL MISSION (OBSTACLE)
+                for k_norm, event_data in pairs(db_events) do
+                    -- Jika teks mentahnya mengandung kata kunci yang sudah disterilkan
+                    if dialog_norm:find(k_norm, 1, true) then
+                        LogToConsole("`b[`5EVENT`b] `dObstacle: " .. event_data.original_name)
+                        action_state = "OBSTACLE" -- Ingat bahwa bot sedang ngerjain Obstacle
+                        event_data.tool()
+                        return true
+                    end
+                end
+
+                -- BACA HP & QUEUE HEALING (Hanya berjalan kalau rintangan bersih)
+                local ship_hp = tonumber(var.v2:lower():match("ship.-(%d+)%%")) or 100
+                local crew_hp = tonumber(var.v2:lower():match("crew.-(%d+)%%")) or 100
+                local rep_hp  = tonumber(var.v2:lower():match("rep.-(%d+)%%")) or 100
+
+                -- Syarat queue: Tidak ada antrean, dan kita tidak sedang menabrak/gagal misi
+                if #queued_heals == 0 and action_state == "IDLE" then
+                    if ship_hp < 50 then table.insert(queued_heals, Gala); table.insert(queued_heals, Gala)
+                    elseif ship_hp <= 60 then table.insert(queued_heals, Gala) end
                     
-                    if ship_hp < 50 then
-                        LogToConsole("`b[`2QUEUE`b] `4Ship kritis ("..ship_hp.."%)! `2Antri 2x Galactibolt.")
-                        table.insert(queued_heals, Gala); table.insert(queued_heals, Gala)
-                    elseif ship_hp <= 60 then
-                        LogToConsole("`b[`2QUEUE`b] `4Ship rendah ("..ship_hp.."%)! `2Antri 1x Galactibolt.")
-                        table.insert(queued_heals, Gala)
-                    end
-
-                    if crew_hp < 50 then
-                        LogToConsole("`b[`2QUEUE`b] `4Crew kritis ("..crew_hp.."%)! `2Antri 2x Space Meds.")
-                        table.insert(queued_heals, Meds); table.insert(queued_heals, Meds)
-                    elseif crew_hp <= 60 then
-                        LogToConsole("`b[`2QUEUE`b] `4Crew rendah ("..crew_hp.."%)! `2Antri 1x Space Meds.")
-                        table.insert(queued_heals, Meds)
-                    end
-
-                    if rep_hp < 50 then
-                        LogToConsole("`b[`2QUEUE`b] `4Reputation kritis ("..rep_hp.."%)! `2Antri 2x Star Supplies.")
-                        table.insert(queued_heals, Sup); table.insert(queued_heals, Sup)
-                    elseif rep_hp <= 60 then
-                        LogToConsole("`b[`2QUEUE`b] `4Reputation rendah ("..rep_hp.."%)! `2Antri 1x Star Supplies.")
-                        table.insert(queued_heals, Sup)
+                    if crew_hp < 50 then table.insert(queued_heals, Meds); table.insert(queued_heals, Meds)
+                    elseif crew_hp <= 60 then table.insert(queued_heals, Meds) end
+                    
+                    if rep_hp < 50 then table.insert(queued_heals, Sup); table.insert(queued_heals, Sup)
+                    elseif rep_hp <= 60 then table.insert(queued_heals, Sup) end
+                    
+                    if #queued_heals > 0 then
+                        LogToConsole("`b[`2QUEUE`b] `4HP Rendah! Mengantre " .. #queued_heals .. "x Heal.")
                     end
                 end
 
-                -- EKSEKUSI ANTREAN HEAL DULUAN (Jika ada)
+                -- TEMBAK ANTREAN HEAL (Kalau ada)
                 if #queued_heals > 0 then
                     local tool_to_use = table.remove(queued_heals, 1)
-                    just_healed = true
+                    action_state = "HEAL" -- Ingat bahwa bot sedang menyuntik Heal
                     tool_to_use()
-                    return true -- Bypass sisa logic, fokus nge-heal!
-                end
-
-                -- PENYADAP EVENT DADAKAN (OBSTACLE)
-                for keyword, tool_func in pairs(external_events) do
-                    if lower_dialog:find(keyword, 1, true) then
-                        if is_late_stage and is_healthy then
-                            LogToConsole("`b[`5SKIP`b] `dObstacle diabaikan! Sisa " .. remaining_steps .. " langkah, HP aman ditabrak.")
-                            break 
-                        else
-                            LogToConsole("`b[`5EVENT`b] `dMenyelesaikan Obstacle: " .. keyword)
-                            handling_event = true
-                            tool_func()
-                            return true 
-                        end
-                    end
+                    return true
                 end
 
                 -- ALUR MISI UTAMA
+                local seq, m_name = getMissionSequenceAndName(raw_title)
                 if seq then
-                    if var.v2:find("Skill Success") then
-                        if not event_finished_now and not just_healed then
-                            successes = successes + 1 
-                        end
-                        neutral_count = 0 
-                        just_healed = false
-                        current_mission = m_name 
-                    elseif var.v2:find("Skill Fail") then
-                        neutral_count = 0 
-                        just_healed = false
+                    -- Kalau misinya ganti/baru, reset ke awal
+                    if current_mission ~= m_name then
                         current_mission = m_name
-                    else
-                        if current_mission == m_name then
-                            if not just_healed and not event_finished_now then
-                                neutral_count = neutral_count + 1
-                                if neutral_count > 3 then
-                                    LogToConsole("`b[`4PAUSE`b] `2Terlalu sering nyangkut! Item habis? Klik manual!")
-                                    return false
-                                end
-                            end
-                        else
-                            if not just_healed and not event_finished_now then
-                                successes = 0 
-                                neutral_count = 0
-                                current_mission = m_name
-                                LogToConsole("`b[`9MISSION`b] `6" .. m_name .. " (Total: " .. #seq .. " Step)")
-                            end
-                        end
-                        just_healed = false
+                        successes = 0
+                        neutral_count = 0
+                        queued_heals = {}
+                        action_state = "IDLE"
+                        LogToConsole("`b[`9MISSION`b] `6" .. m_name .. " (Total: " .. #seq .. " Step)")
+                    end
+
+                    -- Anti-Spam / Lag block
+                    if neutral_count > 3 then
+                        LogToConsole("`b[`4PAUSE`b] `2Macet/Item Habis? Silakan klik manual 1 kali!")
+                        return false
                     end
 
                     local action_index = successes + 1 
                     if seq[action_index] then
+                        action_state = "MISSION" -- Ingat bahwa bot sedang mengeklik Misi Utama
                         seq[action_index]()
                         return true 
                     else
@@ -253,7 +250,8 @@ if true then
                         return false
                     end
                 else
-                    LogToConsole("`b[`4MANUAL`b] `2Misi tidak dikenali: " .. tostring(clean_title))
+                    -- Jika masih ga nembus (sangat mustahil dengan metode baru ini)
+                    LogToConsole("`b[`4ERROR`b] `2Misi tidak dikenali: " .. tostring(raw_title))
                     return false 
                 end
             
@@ -263,10 +261,9 @@ if true then
                 LogToConsole("`b[`4FAIL`b]`2 Misi Gagal! Kapal mundur.")
                 successes = 0
                 current_mission = ""
-                handling_event = false
-                neutral_count = 0
-                just_healed = false
+                action_state = "IDLE"
                 queued_heals = {}
+                neutral_count = 0
                 return true
 
             elseif var.v2:find("The voyage continues!") then
@@ -274,10 +271,9 @@ if true then
                 LogToConsole("`b[`cSUCCESS`b] `2Misi Berhasil Diselesaikan!")
                 successes = 0
                 current_mission = ""
-                handling_event = false
-                neutral_count = 0
-                just_healed = false
+                action_state = "IDLE"
                 queued_heals = {}
+                neutral_count = 0
                 return true
             end
         
@@ -289,9 +285,9 @@ if true then
     end
 
     -- ==========================================
-    -- 4. STARTUP SCRIPT
+    -- 6. STARTUP SCRIPT
     -- ==========================================
-    local dialog = "add_label_with_icon|big|`2Auto Startopia V15|left|18|\nadd_spacer|small\nadd_textbox|`b~ `2Status: Title Catcher & Heal Queue Enabled!|left|\nadd_spacer|small\nadd_quick_exit|"
+    local dialog = "add_label_with_icon|big|`2Auto Startopia V16|left|18|\nadd_spacer|small\nadd_textbox|`b~ `2Status: Perfect Sync & Super Normalization!|left|\nadd_spacer|small\nadd_quick_exit|"
     local arr = {}
     arr.v0 = "OnDialogRequest"
     arr.v1 = dialog
@@ -300,9 +296,8 @@ if true then
     
     successes = 0
     current_mission = ""
-    handling_event = false
-    neutral_count = 0
-    just_healed = false
+    action_state = "IDLE"
     queued_heals = {}
+    neutral_count = 0
     AddHook(Hook, "OnVariant")
 end
