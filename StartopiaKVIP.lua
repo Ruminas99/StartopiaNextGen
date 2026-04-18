@@ -84,7 +84,7 @@ if true then
         ["Secret Stash"] = {Drone, Shield, Teleporter, Giga, Scan, Teleporter},
         ["Set a Course"] = {Drone, Doc},
         ["Shadow Stalkers"] = {Drone, Teleporter, Scan, AI, Giga, Teleporter, Scan, Teleporter, Torp},
-        ["She's Gonna Blow"] = {Drone, Teleporter, Scan, AI, Scan, Giga},
+        ["She's Gonna Blow"] = {Drone, Teleporter, Scan, AI, Scan, Giga, Teleporter},
         ["Space Ship Rescue"] = {Gala, Drone, Teleporter, Scan, Meds, Teleporter},
         ["Skeleton Crew"] = {Teleporter, Scan, AI, Doc},
         ["Solar Impact!"] = {Shield, Gala, Meds, AI, Drone, Gala, Meds, Gala},
@@ -95,8 +95,8 @@ if true then
         ["Taking Aim"] = {Drone, Teleporter, Giga, Teleporter},
         ["Tasty Cakes"] = {Drone, Teleporter, Scan, AI, Scan, Giga, Teleporter},
         ["Weird Contraption"] = {Drone, Teleporter, Scan, Teleporter, Doc},
-        ["Who's there?"] = {Drone, Teleporter, Scan, AI, Scan, Giga},
-        ["Who's There"] = {Drone, Teleporter, Scan, AI, Scan, Giga},
+        ["Who's there?"] = {Drone, Teleporter, Scan, AI, Scan, Giga, Teleporter},
+        ["Who's There"] = {Drone, Teleporter, Scan, AI, Scan, Giga, Teleporter},
         ["Windy Days"] = {Drone, Teleporter, Scan, Teleporter}
     }
 
@@ -138,7 +138,7 @@ if true then
         if norm_title:find("cleanup") then return {Drone, Shield, Torp, Shield, Doc}, raw_title end
         if norm_title:find("duel") then return {Drone, Shield, Torp, AI, Torp}, raw_title end
         if norm_title:find("delivery") then return {Drone, Teleporter, Scan, Giga, Sup, Teleporter}, raw_title end
-        if norm_title:find("extermination") then return {Drone, Teleporter, Scan, Giga, Doc}, raw_title end
+        if norm_title:find("extermination") then return {Drone, Teleporter, Scan, Sup, Giga, Doc}, raw_title end
         if norm_title:find("rescue") then return {Drone, Teleporter, Dip, Meds, Doc}, raw_title end
         return nil, nil
     end
