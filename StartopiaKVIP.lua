@@ -137,8 +137,8 @@ if true then
         if norm_title:find("hunt") then return {Drone, Teleporter, Scan, Giga, Teleporter}, raw_title end
         if norm_title:find("cleanup") then return {Drone, Shield, Torp, Shield, Doc}, raw_title end
         if norm_title:find("duel") then return {Drone, Shield, Torp, AI, Torp}, raw_title end
-        if norm_title:find("delivery") then return {Drone, Teleporter, Scan, Giga, Sup}, raw_title end
-        if norm_title:find("extermination") then return {Drone, Teleporter, Scan, Giga, Sup}, raw_title end
+        if norm_title:find("delivery") then return {Drone, Teleporter, Scan, Giga, Sup, Teleporter}, raw_title end
+        if norm_title:find("extermination") then return {Drone, Teleporter, Scan, Giga, Doc}, raw_title end
         if norm_title:find("rescue") then return {Drone, Teleporter, Dip, Meds, Doc}, raw_title end
         return nil, nil
     end
