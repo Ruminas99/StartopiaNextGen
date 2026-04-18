@@ -33,6 +33,7 @@ if true then
         ["rogue fighter"] = Torp,
         ["Silicoid Worms attached"] = Shield,
         ["Shield Generator still fluctuating"] = Shield,
+        ["Space Debris"] = Shield,
         ["Rabid space dogs"] = Giga,
         ["Disloyal crew"] = Giga,
         ["Space snakes attack"] = Giga,
@@ -100,17 +101,15 @@ if true then
     }
 
     -- ==========================================
-    -- 3. MESIN NORMALISASI (ANTI-TYPO)
+    -- 3. MESIN NORMALISASI & ISOLASI
     -- ==========================================
-    -- Fungsi ini menghapus warna, spasi, dan semua tanda baca agar pencocokan 100% sempurna
     local function cleanString(str)
         if not str then return "" end
-        local s = str:gsub("`.", "") -- Hapus kode warna
-        s = s:gsub("[%p%c%s]", "") -- Hapus spasi dan tanda baca (!, ?, ', dll)
-        return s:lower() -- Jadikan huruf kecil semua
+        local s = str:gsub("`.", "") 
+        s = s:gsub("[%p%c%s]", "") 
+        return s:lower() 
     end
 
-    -- Siapkan database yang sudah bersih
     local db_missions = {}
     for k, v in pairs(exact_missions) do
         db_missions[cleanString(k)] = {original_name = k, seq = v}
@@ -125,7 +124,6 @@ if true then
         if not raw_title or raw_title == "" then return nil, nil end
         local norm_title = cleanString(raw_title)
         
-        -- Cek kecocokan absolut (Abaikan spasi & tanda seru)
         if db_missions[norm_title] then 
             return db_missions[norm_title].seq, db_missions[norm_title].original_name 
         end
@@ -143,11 +141,12 @@ if true then
     end
 
     -- ==========================================
-    -- 4. STATE TRACKER (ANTI LOMPAT)
+    -- 4. STATE TRACKER 
     -- ==========================================
-    local action_state = "IDLE" -- Bisa: "IDLE", "MISSION", "OBSTACLE", "HEAL"
+    local action_state = "IDLE" 
     local successes = 0
     local neutral_count = 0
+    local event_retry_count = 0 -- Tambahan V16.2: Anti Loop Rintangan
     local current_mission = ""
     local queued_heals = {}
 
@@ -160,43 +159,66 @@ if true then
             if var.v2:find("end_dialog|startopia") and var.v2:find("Health") then
                 
                 local raw_title = var.v2:match("add_label_with_icon|big|`w([^|\n]+)")
-                local dialog_norm = cleanString(var.v2)
+                local clean_title = ""
                 
-                -- PROSES SKILL SUCCESS / FAIL BERDASARKAN INGATAN TERAKHIR BOT
+                if raw_title then
+                    clean_title = cleanString(raw_title)
+                end
+
+                -- TITLE ISOLATOR: Menyaring judul misi agar tidak menabrak nama obstacle!
+                local dialog_norm = cleanString(var.v2)
+                local body_norm = dialog_norm
+                if clean_title ~= "" then
+                    -- Bot membuang nama misi utama dari ingatannya saat memindai rintangan
+                    body_norm = dialog_norm:gsub(clean_title, "")
+                end
+
+                -- PROSES SKILL SUCCESS / FAIL
                 local is_success = var.v2:find("Skill Success")
                 local is_fail = var.v2:find("Skill Fail")
 
                 if is_success then
-                    -- HANYA tambah step jika yang sukses itu adalah Tool Misi Utama!
                     if action_state == "MISSION" then
                         successes = successes + 1
                     end
                     action_state = "IDLE"
                     neutral_count = 0
+                    event_retry_count = 0
                 elseif is_fail then
                     action_state = "IDLE"
                     neutral_count = 0
+                    event_retry_count = 0
                 else
-                    neutral_count = neutral_count + 1
+                    if action_state == "MISSION" then
+                        neutral_count = neutral_count + 1
+                    elseif action_state == "OBSTACLE" then
+                        event_retry_count = event_retry_count + 1
+                    end
                 end
 
                 -- DETEKSI EXTERNAL MISSION (OBSTACLE)
                 for k_norm, event_data in pairs(db_events) do
-                    -- Jika teks mentahnya mengandung kata kunci yang sudah disterilkan
-                    if dialog_norm:find(k_norm, 1, true) then
+                    -- Bot HANYA memindai body_norm (yang sudah bebas dari judul misi)
+                    if body_norm:find(k_norm, 1, true) then
+                        
+                        -- ANTI-SPAM RINTANGAN (Mencegah kapal macet dan log penuh)
+                        if event_retry_count > 3 then
+                            LogToConsole("`b[`4PAUSE`b] `2Item Event Habis/Macet! Silakan klik manual.")
+                            return false
+                        end
+
                         LogToConsole("`b[`5EVENT`b] `dObstacle: " .. event_data.original_name)
-                        action_state = "OBSTACLE" -- Ingat bahwa bot sedang ngerjain Obstacle
+                        action_state = "OBSTACLE"
                         event_data.tool()
                         return true
                     end
                 end
 
-                -- BACA HP & QUEUE HEALING (Hanya berjalan kalau rintangan bersih)
+                -- BACA HP & QUEUE HEALING
                 local ship_hp = tonumber(var.v2:lower():match("ship.-(%d+)%%")) or 100
                 local crew_hp = tonumber(var.v2:lower():match("crew.-(%d+)%%")) or 100
                 local rep_hp  = tonumber(var.v2:lower():match("rep.-(%d+)%%")) or 100
 
-                -- Syarat queue: Tidak ada antrean, dan kita tidak sedang menabrak/gagal misi
                 if #queued_heals == 0 and action_state == "IDLE" then
                     if ship_hp < 50 then table.insert(queued_heals, Gala); table.insert(queued_heals, Gala)
                     elseif ship_hp <= 60 then table.insert(queued_heals, Gala) end
@@ -212,10 +234,9 @@ if true then
                     end
                 end
 
-                -- TEMBAK ANTREAN HEAL (Kalau ada)
                 if #queued_heals > 0 then
                     local tool_to_use = table.remove(queued_heals, 1)
-                    action_state = "HEAL" -- Ingat bahwa bot sedang menyuntik Heal
+                    action_state = "HEAL" 
                     tool_to_use()
                     return true
                 end
@@ -223,17 +244,16 @@ if true then
                 -- ALUR MISI UTAMA
                 local seq, m_name = getMissionSequenceAndName(raw_title)
                 if seq then
-                    -- Kalau misinya ganti/baru, reset ke awal
                     if current_mission ~= m_name then
                         current_mission = m_name
                         successes = 0
                         neutral_count = 0
+                        event_retry_count = 0
                         queued_heals = {}
                         action_state = "IDLE"
                         LogToConsole("`b[`9MISSION`b] `6" .. m_name .. " (Total: " .. #seq .. " Step)")
                     end
 
-                    -- Anti-Spam / Lag block
                     if neutral_count > 3 then
                         LogToConsole("`b[`4PAUSE`b] `2Macet/Item Habis? Silakan klik manual 1 kali!")
                         return false
@@ -241,7 +261,7 @@ if true then
 
                     local action_index = successes + 1 
                     if seq[action_index] then
-                        action_state = "MISSION" -- Ingat bahwa bot sedang mengeklik Misi Utama
+                        action_state = "MISSION"
                         seq[action_index]()
                         return true 
                     else
@@ -249,7 +269,6 @@ if true then
                         return false
                     end
                 else
-                    -- Jika masih ga nembus (sangat mustahil dengan metode baru ini)
                     LogToConsole("`b[`4ERROR`b] `2Misi tidak dikenali: " .. tostring(raw_title))
                     return false 
                 end
@@ -263,6 +282,7 @@ if true then
                 action_state = "IDLE"
                 queued_heals = {}
                 neutral_count = 0
+                event_retry_count = 0
                 return true
 
             elseif var.v2:find("The voyage continues!") then
@@ -273,6 +293,7 @@ if true then
                 action_state = "IDLE"
                 queued_heals = {}
                 neutral_count = 0
+                event_retry_count = 0
                 return true
             end
         
@@ -286,7 +307,7 @@ if true then
     -- ==========================================
     -- 6. STARTUP SCRIPT
     -- ==========================================
-    local dialog = "add_label_with_icon|big|`2Auto Startopia V16|left|18|\nadd_spacer|small\nadd_textbox|`b~ `2Status: Perfect Sync & Super Normalization!|left|\nadd_spacer|small\nadd_quick_exit|"
+    local dialog = "add_label_with_icon|big|`2Auto Startopia V16.2|left|18|\nadd_spacer|small\nadd_textbox|`b~ `2Status: Title Isolator & Event Anti-Loop!|left|\nadd_spacer|small\nadd_quick_exit|"
     local arr = {}
     arr.v0 = "OnDialogRequest"
     arr.v1 = dialog
@@ -298,5 +319,6 @@ if true then
     action_state = "IDLE"
     queued_heals = {}
     neutral_count = 0
+    event_retry_count = 0
     AddHook(Hook, "OnVariant")
 end
