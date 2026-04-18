@@ -33,7 +33,6 @@ if true then
         ["rogue fighter"] = Torp,
         ["Silicoid Worms attached"] = Shield,
         ["Shield Generator still fluctuating"] = Shield,
-        ["Space Debris"] = Shield,
         ["Rabid space dogs"] = Giga,
         ["Disloyal crew"] = Giga,
         ["Space snakes attack"] = Giga,
